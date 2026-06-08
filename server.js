@@ -9,7 +9,8 @@ app.use(cors({ origin: '*' }))
 app.use(express.json())
 
 app.use('/api/properties', require('./routes/properties'))
-app.use('/api/auth', require('./routes/auth'))          // ← დაამატე
+app.use('/api/auth', require('./routes/auth'))  
+app.get('/', (req, res) => res.send('Valore Server is running ✓'))        
 
 const PORT = process.env.PORT || 5000
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
