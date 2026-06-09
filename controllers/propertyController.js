@@ -12,13 +12,109 @@ const parseFields = (data) => {
   return data
 }
 
-// GET ALL
+// GET ALL — with filtering
 const getProperties = async (req, res) => {
   try {
     const filter = {}
-    if (req.query.type) filter.type = req.query.type
-    const properties = await Property.find(filter).sort({ createdAt: -1 })
-    res.json(properties)
+    const andClauses = [] // collect $or groups here, merge with $and at the end
+
+    const {
+      type,
+      minPrice, maxPrice,
+      minArea, maxArea,
+      rooms, bedrooms,
+      floor, minFloors, maxFloors,
+      condition, renovation, buildingAge,
+      isAgricultural,
+      city, district,
+      search,
+    } = req.query
+
+    // Enum / exact match
+    if (type)        filter.type = type
+    if (condition)   filter.condition = condition
+    if (renovation)  filter.renovation = renovation
+    if (buildingAge) filter.buildingAge = buildingAge
+    if (rooms)       filter.rooms = Number(rooms)
+    if (bedrooms)    filter.bedrooms = Number(bedrooms)
+    if (floor)       filter.floor = Number(floor)
+
+    // isAgricultural — only apply if explicitly 'true' or 'false'
+    if (isAgricultural === 'true' || isAgricultural === 'false') {
+      filter.isAgricultural = isAgricultural === 'true'
+    }
+
+    // Numeric ranges
+    if (minPrice || maxPrice) {
+      filter.price = {}
+      if (minPrice) filter.price.$gte = Number(minPrice)
+      if (maxPrice) filter.price.$lte = Number(maxPrice)
+    }
+    if (minArea || maxArea) {
+      filter.area = {}
+      if (minArea) filter.area.$gte = Number(minArea)
+      if (maxArea) filter.area.$lte = Number(maxArea)
+    }
+    if (minFloors || maxFloors) {
+      filter.floors = {}
+      if (minFloors) filter.floors.$gte = Number(minFloors)
+      if (maxFloors) filter.floors.$lte = Number(maxFloors)
+    }
+
+    // Bilingual text fields — each becomes its own $or clause
+    if (city) {
+      andClauses.push({ $or: [
+        { 'city.geo': { $regex: city, $options: 'i' } },
+        { 'city.eng': { $regex: city, $options: 'i' } },
+      ]})
+    }
+    if (district) {
+      andClauses.push({ $or: [
+        { 'district.geo': { $regex: district, $options: 'i' } },
+        { 'district.eng': { $regex: district, $options: 'i' } },
+      ]})
+    }
+    if (search) {
+      const re = { $regex: search, $options: 'i' }
+      andClauses.push({ $or: [
+        { 'title.geo': re },    { 'title.eng': re },
+        { 'address.geo': re },  { 'address.eng': re },
+        { 'description.geo': re }, { 'description.eng': re },
+      ]})
+    }
+
+    // Merge all $or groups — if more than one they must ALL match
+    if (andClauses.length === 1) {
+      filter.$or = andClauses[0].$or
+    } else if (andClauses.length > 1) {
+      filter.$and = andClauses
+    }
+
+    // Sorting
+    const sortMap = {
+      newest:     { createdAt: -1 },
+      oldest:     { createdAt:  1 },
+      price_asc:  { price:      1 },
+      price_desc: { price:     -1 },
+      area_asc:   { area:       1 },
+      area_desc:  { area:      -1 },
+    }
+    const sort = sortMap[req.query.sort] ?? { createdAt: -1 }
+
+    // Pagination
+    const page  = Math.max(1, Number(req.query.page)  || 1)
+    const limit = Math.min(100, Number(req.query.limit) || 20)
+    const skip  = (page - 1) * limit
+
+    const [properties, total] = await Promise.all([
+      Property.find(filter).sort(sort).skip(skip).limit(limit),
+      Property.countDocuments(filter),
+    ])
+
+    res.json({
+      data: properties,
+      meta: { total, page, limit, pages: Math.ceil(total / limit) },
+    })
   } catch (err) {
     res.status(500).json({ message: err.message })
   }
