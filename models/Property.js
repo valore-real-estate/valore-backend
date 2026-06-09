@@ -37,6 +37,12 @@ const PropertySchema = new mongoose.Schema({
   // სახლი / კომერციული
   floors: { type: Number },
 
+  // მიწა
+isAgricultural: {
+  type: Boolean,
+  default: null,
+},
+
   // enum ველები — ბექენდზე ინახება, ფრონტი თარგმნის
   buildingAge: {
     type: String,
