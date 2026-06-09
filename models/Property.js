@@ -1,12 +1,28 @@
 const mongoose = require('mongoose')
 
+const bilingualString = (required = false) => ({
+  geo: { type: String, required },
+  eng: { type: String, required },
+})
+
 const PropertySchema = new mongoose.Schema({
   type: {
     type: String,
     enum: ['apartment', 'house', 'commercial', 'land'],
     required: true,
   },
-  address: { type: String, required: true },
+
+  // ტექსტური ველები — ქართული + ინგლისური
+  address: {
+    geo: { type: String, required: true },
+    eng: { type: String, required: true },
+  },
+  description: bilingualString(false),
+  title: bilingualString(false),
+  district: bilingualString(false),
+  city: bilingualString(false),
+
+  // რიცხვითი ველები — ენა არ სჭირდება
   price: { type: Number, required: true },
   area: { type: Number, required: true },
 
@@ -21,7 +37,7 @@ const PropertySchema = new mongoose.Schema({
   // სახლი / კომერციული
   floors: { type: Number },
 
-  // ბინა / სახლი / კომერციული
+  // enum ველები — ბექენდზე ინახება, ფრონტი თარგმნის
   buildingAge: {
     type: String,
     enum: ['new', 'old', null],
