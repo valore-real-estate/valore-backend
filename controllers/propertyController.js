@@ -1,6 +1,17 @@
 const Property = require('../models/Property')
 const cloudinary = require('../config/cloudinary')
 
+const bilingualFields = ['title', 'address', 'description', 'district', 'city']
+
+const parseFields = (data) => {
+  for (const field of bilingualFields) {
+    if (data[field] && typeof data[field] === 'string') {
+      try { data[field] = JSON.parse(data[field]) } catch {}
+    }
+  }
+  return data
+}
+
 // GET ALL
 const getProperties = async (req, res) => {
   try {
@@ -27,14 +38,12 @@ const getProperty = async (req, res) => {
 // CREATE
 const createProperty = async (req, res) => {
   try {
-    const data = { ...req.body }
+    const data = parseFields({ ...req.body })
 
     if (!req.files?.mainPhoto?.[0]) {
       return res.status(400).json({ message: 'Main photo is required' })
     }
-
     data.mainPhoto = req.files.mainPhoto[0].path
-
     if (req.files?.photos) {
       data.photos = req.files.photos.map(f => f.path)
     }
@@ -53,10 +62,9 @@ const updateProperty = async (req, res) => {
     const property = await Property.findById(req.params.id)
     if (!property) return res.status(404).json({ message: 'Not found' })
 
-    const data = { ...req.body }
+    const data = parseFields({ ...req.body })
 
     if (req.files?.mainPhoto?.[0]) {
-      // წაშალე ძველი mainPhoto cloudinary-დან
       const publicId = property.mainPhoto.split('/').pop().split('.')[0]
       await cloudinary.uploader.destroy(`valore/${publicId}`)
       data.mainPhoto = req.files.mainPhoto[0].path
@@ -86,7 +94,6 @@ const deleteProperty = async (req, res) => {
     const property = await Property.findById(req.params.id)
     if (!property) return res.status(404).json({ message: 'Not found' })
 
-    // წაშალე ყველა ფოტო cloudinary-დან
     const allPhotos = [property.mainPhoto, ...property.photos]
     for (const url of allPhotos) {
       const publicId = url.split('/').pop().split('.')[0]
@@ -109,10 +116,8 @@ const deletePhoto = async (req, res) => {
     const { url } = req.body
     const publicId = url.split('/').pop().split('.')[0]
     await cloudinary.uploader.destroy(`valore/${publicId}`)
-
     property.photos = property.photos.filter(p => p !== url)
     await property.save()
-
     res.json(property)
   } catch (err) {
     res.status(500).json({ message: err.message })
